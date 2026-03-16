@@ -211,6 +211,8 @@ set_gpu_flags() {
     "--ozone-platform-hint=$ozone_hint"
     "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder"
     "--disable-features=Vulkan"
+    "--disable-vulkan"
+    "--use-vulkan=none"
   )
 }
 
