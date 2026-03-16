@@ -13,6 +13,7 @@ INSTALL_DEPS=0
 ASSUME_YES=0
 FORCE_PLATFORM="auto"
 FORCE_BROWSER="auto"
+GAME_MODE=0
 
 log() { printf '[INFO] %s\n' "$*"; }
 warn() { printf '[WARN] %s\n' "$*" >&2; }
@@ -30,6 +31,7 @@ Opciones:
   --x11            Fuerza launcher del navegador en X11 (útil para evitar warnings Wayland+Vulkan).
   --wayland        Fuerza launcher del navegador en Wayland.
   --browser        auto|edge|chrome|chromium (default: auto)
+  --game-mode      Crea perfil de launcher para juegos (separado del launcher normal).
   -y, --yes        No pide confirmación interactiva.
   -h, --help       Muestra esta ayuda.
 
@@ -192,6 +194,13 @@ configure_browser_metadata() {
       ;;
   esac
 
+  if [[ "$GAME_MODE" -eq 1 ]]; then
+    WRAPPER_NAME="${WRAPPER_NAME%-gpu}-game"
+    DESKTOP_NAME="${DESKTOP_NAME%-gpu.desktop}-game.desktop"
+    APP_LABEL="${APP_LABEL% (GPU)} (Game Mode)"
+    APP_COMMENT="$APP_COMMENT (modo juegos)"
+  fi
+
   BROWSER_ICON="$(icon_for_channel)"
 }
 
@@ -214,6 +223,16 @@ set_gpu_flags() {
     "--disable-vulkan"
     "--use-vulkan=none"
   )
+
+  if [[ "$GAME_MODE" -eq 1 ]]; then
+    BROWSER_FLAGS+=(
+      "--disable-frame-rate-limit"
+      "--disable-gpu-vsync"
+      "--disable-background-timer-throttling"
+      "--disable-backgrounding-occluded-windows"
+      "--disable-renderer-backgrounding"
+    )
+  fi
 }
 
 backup_and_remove_path() {
@@ -476,7 +495,11 @@ show_next_steps() {
   echo
   log "Listo. Se creó un lanzador nuevo sin tocar archivos del sistema."
   log "Abre desde menú: '$APP_LABEL'"
-  log "También se crearon overrides seguros del launcher estándar en ~/.local/share/applications."
+  if [[ "$GAME_MODE" -eq 1 ]]; then
+    log "Modo juego: se creó un launcher separado sin reemplazar el launcher estándar."
+  else
+    log "También se crearon overrides seguros del launcher estándar en ~/.local/share/applications."
+  fi
   log "Verifica en chrome://gpu (aplica a Edge/Chrome/Chromium)"
   echo
   log "Diagnóstico opcional:"
@@ -563,6 +586,10 @@ parse_args() {
         FORCE_BROWSER="${2,,}"
         shift 2
         ;;
+      --game-mode)
+        GAME_MODE=1
+        shift
+        ;;
       -y|--yes)
         ASSUME_YES=1
         shift
@@ -600,6 +627,7 @@ main() {
 
   log "Navegador detectado: $BROWSER_CHANNEL ($BROWSER_FAMILY)"
   log "Binario: $BROWSER_BIN"
+  log "Perfil: $([[ "$GAME_MODE" -eq 1 ]] && echo game-mode || echo normal)"
   log "Flags GPU: ${BROWSER_FLAGS[*]}"
 
   if [[ "$INSTALL_DEPS" -eq 1 ]]; then
@@ -617,7 +645,9 @@ main() {
   reset_browser_gpu_runtime_state
   write_wrapper
   write_desktop_entry
-  write_standard_browser_overrides
+  if [[ "$GAME_MODE" -eq 0 ]]; then
+    write_standard_browser_overrides
+  fi
   save_last_run
   show_next_steps
 }
